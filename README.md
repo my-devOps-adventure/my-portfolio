@@ -1,4 +1,4 @@
-# DevOps Portfolio
+# DevOps Portfolio - Zineddaine Badr
 
 Portfolio app used to practice a real DevOps delivery loop:
 
