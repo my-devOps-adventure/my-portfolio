@@ -95,6 +95,34 @@ Then open `http://portfolio.local`.
 
 ## GHCR Pull Access
 
-If the container package is private, create an image pull secret in `portfolio-staging` and reference it in the deployment spec.
+Private GHCR packages need credentials in the cluster. The deployment references `ghcr-pull-secret`.
 
-For learning, making the GHCR package public is the simplest path.
+### 1. Create a GitHub PAT
+
+1. GitHub → **Settings → Developer settings → Personal access tokens**
+2. Create a classic token with **`read:packages`**
+3. The token owner must have access to `ghcr.io/my-devops-adventure/portfolio`
+
+### 2. Add staging environment secrets
+
+In **Settings → Environments → staging**, add:
+
+| Secret | Value |
+|--------|--------|
+| `GHCR_PULL_USERNAME` | Your GitHub username |
+| `GHCR_PULL_TOKEN` | PAT with `read:packages` |
+
+The deploy workflow creates/updates `ghcr-pull-secret` in `portfolio-staging` before apply.
+
+### 3. Create the secret manually (fix ErrImagePull now)
+
+```bash
+GHCR_PULL_USERNAME=your-github-user \
+GHCR_PULL_TOKEN=ghp_xxxxxxxx \
+./scripts/create-ghcr-pull-secret.sh
+
+kubectl rollout restart deployment/portfolio -n portfolio-staging
+kubectl rollout status deployment/portfolio -n portfolio-staging --timeout=180s
+```
+
+Alternative: make the GHCR package **public** (Package settings → Change visibility) and remove the pull secret requirement.
