@@ -67,6 +67,14 @@ Required GitHub repository setup:
 2. Add environment secret `K3S_KUBECONFIG_B64`.
 3. Make sure the K3s cluster can pull `ghcr.io/<your-github-owner>/portfolio` images.
 
+How to add the secret in GitHub:
+
+1. Open repository `Settings` -> `Environments` -> `staging`.
+2. Under `Environment secrets`, click `Add secret`.
+3. Name: `K3S_KUBECONFIG_B64`.
+4. Value: base64-encoded kubeconfig from your cluster admin machine.
+5. Save and rerun the `Deploy Staging` workflow.
+
 Create the kubeconfig secret:
 
 ```bash
@@ -74,6 +82,8 @@ base64 -w 0 ~/.kube/config
 ```
 
 Store the output as `K3S_KUBECONFIG_B64`.
+
+The deploy workflow fails early if this secret is missing, then verifies cluster connectivity with `kubectl cluster-info` before applying manifests.
 
 For production later, create a `production` environment with required reviewers.
 
