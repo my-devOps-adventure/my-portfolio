@@ -40,16 +40,24 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Configure kubeconfig
+        if: secrets.K3S_KUBECONFIG_B64 != ''
         run: |
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.K3S_KUBECONFIG_B64 }}" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
+      - name: Skip deployment when kubeconfig secret is missing
+        if: secrets.K3S_KUBECONFIG_B64 == ''
+        run: |
+          echo "::warning::K3S_KUBECONFIG_B64 is not set in the staging environment. Skipping deployment."
+
       - name: Deploy manifests with selected image
+        if: secrets.K3S_KUBECONFIG_B64 != ''
         run: |
           kubectl kustomize k8s/staging \
             | sed "s#ghcr.io/example/portfolio:latest#${IMAGE_NAME}:${IMAGE_TAG}#g" \
             | kubectl apply --validate=false -f -
 
       - name: Wait for rollout
+        if: secrets.K3S_KUBECONFIG_B64 != ''
         run: kubectl rollout status deployment/portfolio --namespace portfolio-staging --timeout=120s
