@@ -21,7 +21,7 @@ Copy kubeconfig for GitHub Actions:
 base64 -w 0 ~/.kube/config
 ```
 
-Store the output as the `K3S_KUBECONFIG_B64` secret in the GitHub `staging` environment.
+Store the output as the `K3S_KUBECONFIG_B64` secret in the GitHub `staging` environment. This secret is mandatory: the deploy workflow fails immediately if it is missing or not valid base64.
 
 ## Apply Staging Manifests
 

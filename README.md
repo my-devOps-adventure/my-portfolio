@@ -64,7 +64,7 @@ Workflows:
 Required GitHub repository setup:
 
 1. Create an environment named `staging`.
-2. Add environment secret `K3S_KUBECONFIG_B64`.
+2. Add environment secret `K3S_KUBECONFIG_B64` (base64-encoded kubeconfig). The deploy workflow fails fast if this secret is missing or invalid.
 3. Make sure the K3s cluster can pull `ghcr.io/<your-github-owner>/portfolio` images.
 
 Create the kubeconfig secret:
