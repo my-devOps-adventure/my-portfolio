@@ -76,9 +76,41 @@ sudo mv kubectl /usr/local/bin/
 | Error | Fix |
 |-------|-----|
 | `dial tcp 192.168.x.x:6443: i/o timeout` on `ubuntu-latest` | Expected — switch workflow to self-hosted runner (already done in repo) |
+| **Waiting for a runner to pick up this job** (6+ min) | See [Runner not picking up jobs](#runner-not-picking-up-jobs) below |
 | Job queued, no runner | Runner offline — run `sudo ./svc.sh status` in `~/actions-runner` |
 | `Missing K3S_KUBECONFIG_B64` | Add secret to **Environments → staging**, not repository secrets |
-| `ImagePullBackOff` after deploy | Make GHCR package public or add an image pull secret |
+| `ImagePullBackOff` after deploy | Add `GHCR_PULL_USERNAME` + `GHCR_PULL_TOKEN` secrets, or make GHCR package public |
+
+### Runner not picking up jobs
+
+1. **Restart the runner service** (broker can disconnect after a failed job):
+
+```bash
+cd ~/Desktop/actions-runner
+sudo ./svc.sh stop
+sudo ./svc.sh start
+sudo ./svc.sh status
+```
+
+Confirm the log shows `Listening for Jobs`.
+
+2. **Allow org runners on the repository**
+
+Repository → **Settings → Actions → General** → enable use of organization runners (wording varies).
+
+3. **Runner group must include this repo**
+
+Org → **Settings → Actions → Runner groups → Default → Repository access** → **All repositories** (or add `my-portfolio`).
+
+4. **Cancel stuck workflow runs**
+
+Actions → cancel any old **Deploy Staging** runs still marked *Queued* or *In progress*.
+
+5. **Prefer a repository-level runner** (simplest for one repo)
+
+Repo → **Settings → Actions → Runners → New self-hosted runner** (use a fresh token; tokens are one-time use).
+
+When configuring, use `--labels k3s-staging` and press **Enter** for the runner group (Default).
 
 ## Security notes
 

@@ -21,7 +21,7 @@ jobs:
     name: Deploy To K3s Staging
     # GitHub-hosted runners cannot reach a private LAN IP (e.g. 192.168.x.x).
     # Install a self-hosted runner on the K3s machine — see docs/github-self-hosted-runner.md.
-    runs-on: [self-hosted, Linux, X64, k3s-staging]
+    runs-on: k3s-staging
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     environment:
       name: staging
