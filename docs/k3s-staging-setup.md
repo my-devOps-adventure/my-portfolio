@@ -6,7 +6,9 @@ Use this guide to prepare the cluster that receives portfolio staging deployment
 
 - A K3s cluster with kubectl access
 - Traefik ingress enabled (default in K3s)
-- Network access from GitHub Actions runners to the Kubernetes API
+- A [self-hosted GitHub Actions runner](./github-self-hosted-runner.md) on the K3s machine (required for home LAN setups)
+
+GitHub cloud runners **cannot** reach private IPs like `192.168.1.103`. If deploy fails with `dial tcp ... i/o timeout`, install the self-hosted runner — do not expose port 6443 to the public internet for learning setups.
 
 ## Install K3s Locally (Optional)
 
@@ -24,13 +26,11 @@ K3s stores admin credentials in `/etc/rancher/k3s/k3s.yaml` with root-only permi
 kubectl get nodes
 ```
 
-For GitHub Actions, the kubeconfig server must be reachable from the public internet (not `127.0.0.1`). Use your K3s machine IP or hostname:
+For GitHub Actions with a **self-hosted runner** on the same machine, use `127.0.0.1`:
 
 ```bash
-./scripts/setup-k3s-kubeconfig.sh 192.168.1.50
+./scripts/setup-k3s-kubeconfig.sh
 ```
-
-Open port `6443` on the K3s host firewall if GitHub runners cannot reach the API.
 
 Copy kubeconfig for GitHub Actions:
 
@@ -39,6 +39,8 @@ base64 -w 0 ~/.kube/config
 ```
 
 Store the output as the `K3S_KUBECONFIG_B64` secret in the GitHub `staging` environment.
+
+See [github-self-hosted-runner.md](./github-self-hosted-runner.md) for full runner setup.
 
 GitHub UI path:
 

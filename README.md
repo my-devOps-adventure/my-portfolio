@@ -64,8 +64,9 @@ Workflows:
 Required GitHub repository setup:
 
 1. Create an environment named `staging`.
-2. Add environment secret `K3S_KUBECONFIG_B64`.
-3. Make sure the K3s cluster can pull `ghcr.io/<your-github-owner>/portfolio` images.
+2. Add environment secret `K3S_KUBECONFIG_B64` (kubeconfig with `127.0.0.1` from `./scripts/setup-k3s-kubeconfig.sh`).
+3. Install a [self-hosted runner](./docs/github-self-hosted-runner.md) on the K3s machine (label: `k3s-staging`).
+4. Make sure the K3s cluster can pull `ghcr.io/<your-github-owner>/portfolio` images.
 
 How to add the secret in GitHub:
 
