@@ -16,10 +16,6 @@ on:
 permissions:
   contents: read
 
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/portfolio
-  IMAGE_TAG: ${{ github.event.inputs.image_tag || github.sha }}
-
 jobs:
   deploy:
     name: Deploy To K3s Staging
@@ -33,10 +29,17 @@ jobs:
     concurrency:
       group: portfolio-staging
       cancel-in-progress: false
+    env:
+      IMAGE_TAG: ${{ github.event.inputs.image_tag || github.sha }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Set image name
+        run: |
+          owner_lc="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "IMAGE_NAME=ghcr.io/${owner_lc}/portfolio" >> "$GITHUB_ENV"
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
@@ -63,6 +66,7 @@ jobs:
 
       - name: Deploy manifests with selected image
         run: |
+          echo "Deploying ${IMAGE_NAME}:${IMAGE_TAG}"
           kubectl kustomize k8s/staging \
             | sed "s#ghcr.io/example/portfolio:latest#${IMAGE_NAME}:${IMAGE_TAG}#g" \
             | kubectl apply --validate=false -f -
