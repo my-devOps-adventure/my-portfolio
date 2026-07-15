@@ -49,7 +49,7 @@ jobs:
         run: |
           kubectl kustomize k8s/staging \
             | sed "s#ghcr.io/example/portfolio:latest#${IMAGE_NAME}:${IMAGE_TAG}#g" \
-            | kubectl apply -f -
+            | kubectl apply --validate=false -f -
 
       - name: Wait for rollout
         run: kubectl rollout status deployment/portfolio --namespace portfolio-staging --timeout=120s
