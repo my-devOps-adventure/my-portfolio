@@ -39,17 +39,37 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
 
+      - name: Check kubeconfig secret
+        id: kubeconfig
+        run: |
+          if [ -z "${{ secrets.K3S_KUBECONFIG_B64 }}" ]; then
+            echo "::warning::K3S_KUBECONFIG_B64 is not set. Skipping staging deployment."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! echo "${{ secrets.K3S_KUBECONFIG_B64 }}" | base64 --decode >/dev/null 2>&1; then
+            echo "::warning::K3S_KUBECONFIG_B64 is not valid base64. Skipping staging deployment."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+
       - name: Configure kubeconfig
+        if: steps.kubeconfig.outputs.should_deploy == 'true'
         run: |
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.K3S_KUBECONFIG_B64 }}" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
       - name: Deploy manifests with selected image
+        if: steps.kubeconfig.outputs.should_deploy == 'true'
         run: |
           kubectl kustomize k8s/staging \
             | sed "s#ghcr.io/example/portfolio:latest#${IMAGE_NAME}:${IMAGE_TAG}#g" \
             | kubectl apply --validate=false -f -
 
       - name: Wait for rollout
+        if: steps.kubeconfig.outputs.should_deploy == 'true'
         run: kubectl rollout status deployment/portfolio --namespace portfolio-staging --timeout=120s
