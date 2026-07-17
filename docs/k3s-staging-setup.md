@@ -2,6 +2,8 @@
 
 Use this guide to prepare the cluster that receives portfolio staging deployments.
 
+See also: [lessons-BZINEDDA-141-k3s-staging.md](./lessons-BZINEDDA-141-k3s-staging.md) for mistakes we hit and how to avoid them.
+
 ## Prerequisites
 
 - A K3s cluster with kubectl access

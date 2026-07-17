@@ -43,3 +43,5 @@ Use these statuses in Jira:
 - GHCR package with image tags.
 - K3s rollout status.
 - Running portfolio app in staging.
+
+Completed example: [lessons-BZINEDDA-141-k3s-staging.md](./lessons-BZINEDDA-141-k3s-staging.md)
