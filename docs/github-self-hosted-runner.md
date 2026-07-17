@@ -22,42 +22,47 @@ base64 -w 0 ~/.kube/config
 
 Update the GitHub **staging** environment secret `K3S_KUBECONFIG_B64` with that output.
 
-## 2. Install the runner (one time)
+Also add staging environment secrets for private GHCR pulls:
 
-1. Open GitHub: **Repository → Settings → Actions → Runners → New self-hosted runner**.
-2. Choose **Linux** and **x64**.
-3. On the K3s machine, run the commands GitHub shows. Example:
+| Secret | Value |
+|--------|--------|
+| `GHCR_PULL_USERNAME` | Your GitHub username |
+| `GHCR_PULL_TOKEN` | PAT with `read:packages` |
+
+## 2. Install a repository-level runner (recommended)
+
+Use a **repository** runner, not an organization runner. Org runners often cause jobs to sit in **Waiting for a runner** unless runner-group repository access is configured correctly.
+
+1. Open **my-portfolio → Settings → Actions → Runners → New self-hosted runner**
+2. Choose **Linux / x64** and copy the registration token
+3. On the K3s machine:
 
 ```bash
-mkdir -p ~/actions-runner && cd ~/actions-runner
-
-# Download (check GitHub UI for the latest version URL)
-curl -o actions-runner-linux-x64-2.322.0.tar.gz -L \
-  https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-linux-x64-2.322.0.tar.gz
-tar xzf ./actions-runner-linux-x64-*.tar.gz
-
-# Configure — paste the token from the GitHub UI when prompted
-./config.sh --url https://github.com/my-devOps-adventure/my-portfolio \
-  --token YOUR_TOKEN_FROM_GITHUB \
-  --labels k3s-staging \
-  --name k3s-staging-runner
-
-# Install and start as a service (survives reboot)
-sudo ./svc.sh install
-sudo ./svc.sh start
-sudo ./svc.sh status
+cd /path/to/my-portfolio
+RUNNER_TOKEN=paste_token_here ./scripts/install-repo-runner.sh
 ```
 
-The label `k3s-staging` must match the workflow `runs-on` labels.
+The workflow expects:
+
+```yaml
+runs-on: [self-hosted, k3s-staging]
+```
+
+### Migrate from an org-level runner
+
+If you previously registered at `https://github.com/my-devOps-adventure`:
+
+1. Org → **Settings → Actions → Runners** → remove `k3s-staging-runner`
+2. Install again with `./scripts/install-repo-runner.sh` using a **repository** token
 
 ## 3. Runner prerequisites
 
 The K3s host needs:
 
 - `kubectl` (from K3s or standalone)
-- Network access to pull from `ghcr.io` (for staging deploys)
+- Network access to `broker.actions.githubusercontent.com` and `ghcr.io`
 
-Install kubectl on the runner user if needed:
+Install kubectl if needed:
 
 ```bash
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -67,20 +72,48 @@ sudo mv kubectl /usr/local/bin/
 
 ## 4. Test the deploy workflow
 
-1. Confirm the runner appears as **Idle** in GitHub → Settings → Actions → Runners.
-2. Run **Deploy Staging** manually (workflow_dispatch) or merge to `main` and wait for **Publish Image** to finish.
-3. The job should pick up the self-hosted runner and pass `kubectl cluster-info`.
+1. Confirm the runner appears as **Idle** under **repository** Settings → Actions → Runners
+2. Run **Deploy Staging** manually (workflow_dispatch)
+3. The job log should show `Runner name: k3s-staging-runner` and pass `kubectl cluster-info`
 
 ## Troubleshooting
 
 | Error | Fix |
 |-------|-----|
-| `dial tcp 192.168.x.x:6443: i/o timeout` on `ubuntu-latest` | Expected — switch workflow to self-hosted runner (already done in repo) |
-| Job queued, no runner | Runner offline — run `sudo ./svc.sh status` in `~/actions-runner` |
-| `Missing K3S_KUBECONFIG_B64` | Add secret to **Environments → staging**, not repository secrets |
-| `ImagePullBackOff` after deploy | Make GHCR package public or add an image pull secret |
+| `Waiting for a runner to pick up this job` | Use a **repository** runner; restart with `./scripts/restart-github-runner.sh` |
+| `Runner connect error: broker.actions.githubusercontent.com` | Network issue — restart runner; check firewall/DNS |
+| `dial tcp 127.0.0.1:6443: connection refused` | Job ran on GitHub cloud, not self-hosted — fix runner pickup first |
+| `InvalidImageName` | Image name must be lowercase — merge latest deploy workflow |
+| `ErrImagePull` | Add `GHCR_PULL_USERNAME` + `GHCR_PULL_TOKEN` staging secrets |
+| `Missing K3S_KUBECONFIG_B64` | Add secret to **Environments → staging** |
+
+### Runner not picking up jobs
+
+1. **Restart the runner**:
+
+```bash
+./scripts/restart-github-runner.sh
+```
+
+Confirm logs show `Listening for Jobs`.
+
+2. **Verify runner is repository-level**
+
+Check **my-portfolio → Settings → Actions → Runners**, not only the org runners page.
+
+3. **Cancel stuck workflow runs**
+
+Actions → cancel old **Deploy Staging** runs stuck in *Queued* or *In progress*.
+
+4. **Reinstall with a fresh token**
+
+Tokens are one-time use:
+
+```bash
+RUNNER_TOKEN=new_token ./scripts/install-repo-runner.sh
+```
 
 ## Security notes
 
-- The self-hosted runner can run code from your repo when workflows trigger. Use it only for trusted repos/branches.
-- For production, prefer a dedicated VM with K3s and a locked-down runner, not your daily driver laptop.
+- The self-hosted runner executes workflow code from your repo. Use it only for trusted repos/branches.
+- For production, prefer a dedicated VM with K3s and a locked-down runner.
