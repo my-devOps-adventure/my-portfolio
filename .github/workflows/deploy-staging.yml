@@ -30,7 +30,8 @@ jobs:
       cancel-in-progress: true
     timeout-minutes: 15
     env:
-      IMAGE_TAG: ${{ github.event.inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
+      # Publish Image always tags main builds as :latest. Use that for workflow_run deploys.
+      IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
 
     steps:
       - name: Runner diagnostics
@@ -101,3 +102,10 @@ jobs:
 
       - name: Wait for rollout
         run: kubectl rollout status deployment/portfolio --namespace portfolio-staging --timeout=180s
+
+      - name: Diagnose rollout failures
+        if: failure()
+        run: |
+          kubectl get pods -n portfolio-staging -o wide
+          kubectl describe pods -n portfolio-staging | tail -40
+          kubectl get events -n portfolio-staging --sort-by='.lastTimestamp' | tail -15
