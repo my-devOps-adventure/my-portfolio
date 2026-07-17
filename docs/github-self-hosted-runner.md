@@ -42,10 +42,19 @@ cd /path/to/my-portfolio
 RUNNER_TOKEN=paste_token_here ./scripts/install-repo-runner.sh
 ```
 
-The workflow expects:
+The workflow uses:
 
 ```yaml
-runs-on: [self-hosted, k3s-staging]
+runs-on: self-hosted
+```
+
+Or with an explicit label: `runs-on: [self-hosted, k3s-staging]`
+
+### Quick fix for runner registration
+
+```bash
+cd /path/to/my-portfolio
+RUNNER_TOKEN=paste_token_here ./scripts/fix-repo-runner.sh
 ```
 
 ### Migrate from an org-level runner
@@ -74,7 +83,7 @@ sudo mv kubectl /usr/local/bin/
 
 1. Confirm the runner appears as **Idle** under **repository** Settings → Actions → Runners
 2. Run **Deploy Staging** manually (workflow_dispatch)
-3. The job log should show `Runner name: k3s-staging-runner` and pass `kubectl cluster-info`
+3. The job log should show `Runner name: bzinedda` (or your runner name) and pass `kubectl cluster-info`
 
 ## Troubleshooting
 
@@ -84,7 +93,7 @@ sudo mv kubectl /usr/local/bin/
 | `Runner connect error: broker.actions.githubusercontent.com` | Network issue — restart runner; check firewall/DNS |
 | `dial tcp 127.0.0.1:6443: connection refused` | Job ran on GitHub cloud, not self-hosted — fix runner pickup first |
 | `InvalidImageName` | Image name must be lowercase — merge latest deploy workflow |
-| `ErrImagePull` | Add `GHCR_PULL_USERNAME` + `GHCR_PULL_TOKEN` staging secrets |
+| `ImagePullBackOff` / `not found` | Check image tag (`:latest` exists); add GHCR secrets if private |
 | `Missing K3S_KUBECONFIG_B64` | Add secret to **Environments → staging** |
 
 ### Runner not picking up jobs

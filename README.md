@@ -8,6 +8,23 @@ Portfolio app used to practice a real DevOps delivery loop:
 4. Publish a Docker image to GitHub Container Registry.
 5. Deploy the image to a K3s staging environment.
 
+## Current Status (BZINEDDA-141 — Done)
+
+Staging deploy is **working end-to-end**:
+
+```text
+main push -> Publish Image (GHCR) -> Deploy Staging (self-hosted runner) -> K3s rollout
+```
+
+| Layer | Detail |
+|-------|--------|
+| Image | `ghcr.io/my-devops-adventure/portfolio:latest` |
+| Cluster | Local K3s, namespace `portfolio-staging` |
+| URL | `http://portfolio.local` (add `127.0.0.1 portfolio.local` to `/etc/hosts`) |
+| Runner | Repository self-hosted runner on the K3s host |
+
+**Lessons and mistakes from this story:** [docs/lessons-BZINEDDA-141-k3s-staging.md](./docs/lessons-BZINEDDA-141-k3s-staging.md)
+
 ## Jira And GitHub Linking
 
 Install the official `GitHub for Jira` app in Jira Cloud, then connect the GitHub account or organization that owns this repository.
@@ -26,6 +43,8 @@ BZINEDDA-107 feat: logout
 ```
 
 The CI workflow checks the branch name and PR title for a Jira key. When the GitHub for Jira app is connected, Jira displays linked branches, commits, pull requests, builds, and deployments in the work item development panel.
+
+See also: [docs/jira-github-workflow.md](./docs/jira-github-workflow.md)
 
 ## Local Development
 
@@ -57,70 +76,97 @@ Open `http://localhost:8080`.
 
 Workflows:
 
-- `.github/workflows/ci.yml`: validates Jira key convention, lints, tests, and builds.
-- `.github/workflows/publish-image.yml`: publishes images to GitHub Container Registry.
-- `.github/workflows/deploy-staging.yml`: deploys to K3s staging.
+| Workflow | Runner | Purpose |
+|----------|--------|---------|
+| `.github/workflows/ci.yml` | GitHub-hosted | Jira key check, lint, test, build |
+| `.github/workflows/publish-image.yml` | GitHub-hosted | Build and push to GHCR |
+| `.github/workflows/deploy-staging.yml` | **Self-hosted** | Deploy to local K3s |
 
-Required GitHub repository setup:
+### Staging environment setup (one time)
 
-1. Create an environment named `staging`.
-2. Add environment secret `K3S_KUBECONFIG_B64` (kubeconfig with `127.0.0.1` from `./scripts/setup-k3s-kubeconfig.sh`).
-3. Add environment secrets `GHCR_PULL_USERNAME` and `GHCR_PULL_TOKEN` (PAT with `read:packages`) for private GHCR images.
-4. Install a [self-hosted runner](./docs/github-self-hosted-runner.md) on the K3s machine (label: `k3s-staging`).
-5. Make sure the K3s cluster can pull `ghcr.io/my-devops-adventure/portfolio` images (lowercase).
+1. Create GitHub environment **`staging`**.
+2. Add secrets (environment scope, not repository):
 
-How to add the secret in GitHub:
+| Secret | How to create |
+|--------|----------------|
+| `K3S_KUBECONFIG_B64` | `./scripts/setup-k3s-kubeconfig.sh` then `base64 -w 0 ~/.kube/config` |
+| `GHCR_PULL_USERNAME` | Your GitHub username |
+| `GHCR_PULL_TOKEN` | Classic PAT with `read:packages` |
 
-1. Open repository `Settings` -> `Environments` -> `staging`.
-2. Under `Environment secrets`, click `Add secret`.
-3. Name: `K3S_KUBECONFIG_B64`.
-4. Value: base64-encoded kubeconfig from your cluster admin machine.
-5. Save and rerun the `Deploy Staging` workflow.
-
-Create the kubeconfig secret:
+3. Install a [repository self-hosted runner](./docs/github-self-hosted-runner.md) on the K3s machine:
 
 ```bash
-base64 -w 0 ~/.kube/config
+RUNNER_TOKEN=token_from_github ./scripts/fix-repo-runner.sh
 ```
 
-Store the output as `K3S_KUBECONFIG_B64`.
+4. Merge to `main` and confirm **Publish Image** then **Deploy Staging** succeed.
 
-The deploy workflow fails early if this secret is missing, then verifies cluster connectivity with `kubectl cluster-info` before applying manifests.
+Detailed guides:
 
-For production later, create a `production` environment with required reviewers.
+- [K3s staging setup](./docs/k3s-staging-setup.md)
+- [Self-hosted runner setup](./docs/github-self-hosted-runner.md)
+- [Lessons learned (BZINEDDA-141)](./docs/lessons-BZINEDDA-141-k3s-staging.md)
 
 ## K3s Deployment
 
 Manifests live in `k8s/staging`.
 
-Apply manually:
+### Remote deploy (via GitHub Actions)
+
+Triggered automatically after **Publish Image** on `main`, or manually via **Deploy Staging** workflow.
+
+### Local deploy (without GHCR)
 
 ```bash
-kubectl apply -k k8s/staging
-kubectl rollout status deployment/portfolio --namespace portfolio-staging
+./scripts/setup-k3s-kubeconfig.sh
+docker build -t ghcr.io/my-devops-adventure/portfolio:local .
+./scripts/import-image-to-k3s.sh ghcr.io/my-devops-adventure/portfolio:local
+IMAGE_TAG=local ./scripts/deploy-staging-local.sh
 ```
 
-If you use the default ingress host, add this to `/etc/hosts` for local testing:
+Add to `/etc/hosts` for ingress testing:
 
 ```text
 127.0.0.1 portfolio.local
 ```
 
-## First Practice Loop
+Verify:
 
-Use story **`BZINEDDA-137`** (`feat: portfolio homepage`):
+```bash
+kubectl get pods -n portfolio-staging
+curl -s http://portfolio.local/healthz
+```
 
-1. Move `BZINEDDA-137` to `todo` in Jira.
-2. Create branch `BZINEDDA-137-feat-homepage`.
-3. Commit with `BZINEDDA-137 feat: portfolio homepage`.
-4. Open PR `BZINEDDA-137 feat: portfolio homepage`.
-5. Wait for CI.
-6. Merge to `main`.
-7. Confirm the image publish and staging deployment.
-8. Move `BZINEDDA-137` to `done`.
+## Helper Scripts
 
-This creates the professional trace:
+| Script | Purpose |
+|--------|---------|
+| `scripts/setup-k3s-kubeconfig.sh` | Fix local kubectl access to K3s |
+| `scripts/import-image-to-k3s.sh` | Import Docker image into K3s |
+| `scripts/deploy-staging-local.sh` | Deploy imported image to staging |
+| `scripts/create-ghcr-pull-secret.sh` | GHCR pull secret for private packages |
+| `scripts/fix-repo-runner.sh` | Register/repair repository runner |
+| `scripts/restart-github-runner.sh` | Restart runner after broker issues |
+| `scripts/validate-jira-key.sh` | Used by CI to enforce Jira keys |
+
+## Practice Loops
+
+| Story | Doc |
+|-------|-----|
+| BZINEDDA-137 — portfolio homepage | [docs/practice-loop-BZINEDDA-137.md](./docs/practice-loop-BZINEDDA-137.md) |
+| BZINEDDA-141 — K3s staging deploy | [docs/lessons-BZINEDDA-141-k3s-staging.md](./docs/lessons-BZINEDDA-141-k3s-staging.md) |
+
+Professional trace we aim for on every story:
 
 ```text
-Jira work item -> branch -> commit -> PR -> CI -> image -> staging deployment
+Jira work item -> branch -> commit -> PR -> CI -> image -> staging deployment -> done
 ```
+
+## Next Learning Goals
+
+- Production environment on a dedicated VM (not home LAN)
+- TLS ingress and a real DNS name
+- Rollback strategy and deployment health gates
+- Observability (logs/metrics) for staging
+
+We keep learning by shipping small stories through the same loop and documenting mistakes in `docs/`.
