@@ -19,8 +19,8 @@ permissions:
 jobs:
   deploy:
     name: Deploy To K3s Staging
-    # Requires a self-hosted runner on the K3s machine — see docs/github-self-hosted-runner.md.
-    runs-on: [self-hosted, k3s-staging]
+    # Match any self-hosted runner on this repo (label k3s-staging preferred).
+    runs-on: self-hosted
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     environment:
       name: staging
